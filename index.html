@@ -88,6 +88,11 @@
     position:relative;z-index:1;
   }
   .logo b{color:var(--papel)}
+  .logo-img{
+    height:clamp(2.4rem,8vw,5rem);
+    width:auto;max-width:min(90%,520px);
+    display:block;position:relative;z-index:1;
+  }
   .tagline{
     position:relative;z-index:1;
     margin-top:.35rem;
@@ -147,9 +152,11 @@
   main{max-width:1150px;margin:0 auto;padding:1rem clamp(1rem,5vw,3rem) 4rem}
   .grid{
     display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+    grid-template-columns:repeat(4,1fr);
     gap:1.4rem;
   }
+  @media (max-width:1000px){ .grid{grid-template-columns:repeat(3,1fr)} }
+  @media (max-width:680px){ .grid{grid-template-columns:repeat(2,1fr);gap:1rem} }
   .card{
     background:#fff;
     border:4px solid var(--negro);
@@ -225,6 +232,18 @@
     margin-top:1rem;line-height:1.4;
   }
 
+  .ver-mas-wrap{display:flex;justify-content:center;margin-top:2.2rem}
+  .ver-mas{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:1.7rem;letter-spacing:.06em;
+    background:var(--amarillo);color:var(--negro);
+    border:4px solid var(--negro);
+    box-shadow:var(--sombra);
+    padding:.55rem 2.6rem;cursor:pointer;
+  }
+  .ver-mas:hover{transform:translate(-3px,-3px);box-shadow:var(--sombra-hover)}
+  .ver-mas:active{transform:translate(2px,2px);box-shadow:3px 3px 0 var(--negro)}
+
   footer{
     background:var(--negro);color:var(--papel);
     text-align:center;padding:1.6rem 1rem;
@@ -243,7 +262,9 @@
 <body>
 
 <header>
-  <div class="logo">BU<b>K</b>Z</div>
+  <img class="logo-img" src="https://cdn.shopify.com/s/files/1/0043/3016/0163/files/logo-bukz-amarillo.png?v=1763760502" alt="Bukz"
+       onerror="this.style.display='none';document.getElementById('logoText').style.display='block'">
+  <div class="logo" id="logoText" style="display:none">BU<b>K</b>Z</div>
   <p class="tagline">Escribe el nombre del libro. Nosotros lo tenemos.<span class="punto"> Punto.</span></p>
 </header>
 
@@ -291,6 +312,9 @@
   </div>
 
   <div class="grid" id="grid"></div>
+  <div class="ver-mas-wrap hidden" id="verMasWrap">
+    <button class="ver-mas" id="verMas">Ver más</button>
+  </div>
 </main>
 
 <footer>
@@ -311,12 +335,17 @@
   const $error = document.getElementById('estadoError');
   const $errorMsg = document.getElementById('errorMsg');
   const waConseguir = document.getElementById('waConseguir');
+  const verMasWrap = document.getElementById('verMasWrap');
+  const verMas = document.getElementById('verMas');
 
   let catalogo = [];      // catálogo cacheado
   let cargando = false;   // evita cargas dobles
   let cargado = false;
   let enModoDemo = false; // true solo si el fetch falló y usamos ejemplos
   let debounce;
+  let listaActiva = [];   // lista que se está paginando (catálogo o resultados)
+  let mostrados = 0;      // cuántas tarjetas van renderizadas
+  const PAGE_SIZE = 24;   // tarjetas por tanda
 
   // ── Utilidades ──
   const money = n => {
@@ -347,6 +376,7 @@
     [$inicial,$cargando,$vacio,$error].forEach(e=>e.classList.add('hidden'));
     grid.innerHTML='';
     meta.classList.add('hidden');
+    verMasWrap.classList.add('hidden');
     if(estado) estado.classList.remove('hidden');
   }
 
@@ -467,17 +497,11 @@
   // ── Buscar ──
   async function buscar(termino){
     const t = norm(termino.trim());
-    if(!t){ mostrar($inicial); return; }
+    if(!t){ mostrarBrowse(); return; }
 
     if(!cargado){
       mostrar($cargando);
-      try{ await cargarCatalogo(); }
-      catch(err){
-        $errorMsg.textContent = 'No pudimos conectar con el catálogo de "'
-          + CONFIG.SHOPIFY_DOMAIN + '". Revisa el dominio en la configuración.';
-        mostrar($error);
-        return;
-      }
+      await cargarCatalogo();
     }
 
     const palabras = t.split(/\s+/);
@@ -495,39 +519,65 @@
       mostrar($vacio);
       return;
     }
-    render(resultados, termino.trim());
+    listaActiva = resultados;
+    renderReset('Resultados para "' + termino.trim() + '"');
   }
 
-  // ── Render de tarjetas ──
-  function render(libros, termino){
+  // ── Catálogo completo (home) ──
+  async function mostrarBrowse(){
+    if(!cargado){
+      mostrar($cargando);
+      await cargarCatalogo();
+    }
+    listaActiva = catalogo;
+    renderReset('Todo el catálogo');
+  }
+
+  // ── Render paginado ──
+  function renderReset(titulo){
     mostrar(null);
     meta.classList.remove('hidden');
-    metaText.textContent = 'Resultados para "' + termino + '"';
-    count.textContent = libros.length + (libros.length === 1 ? ' libro' : ' libros');
+    metaText.textContent = titulo;
+    count.textContent = listaActiva.length + (listaActiva.length === 1 ? ' libro' : ' libros');
+    mostrados = 0;
+    grid.innerHTML = '';
+    renderMas();
+  }
 
+  function renderMas(){
     const frag = document.createDocumentFragment();
-    libros.slice(0,60).forEach(l=>{
-      const card = document.createElement('article');
-      card.className = 'card';
-
-      const imgHtml = l.image
-        ? '<img src="'+l.image+'" alt="Portada de '+esc(l.title)+'" loading="lazy">'
-        : '<div class="no-img">'+esc(l.title.slice(0,40))+'</div>';
-      const agotado = l.available ? '' : '<span class="badge-agotado">Agotado</span>';
-
-      card.innerHTML =
-        '<div class="card-img">'+agotado+imgHtml+'</div>'+
-        '<div class="card-body">'+
-          '<div class="card-title">'+esc(l.title)+'</div>'+
-          (l.author ? '<div class="card-author">'+esc(l.author)+'</div>' : '')+
-          '<div class="card-price">'+money(l.price)+'</div>'+
-          '<a class="wa-btn" href="'+waLink(l)+'" target="_blank" rel="noopener">'+
-            waSvg()+' Pedir por WhatsApp'+
-          '</a>'+
-        '</div>';
-      frag.appendChild(card);
-    });
+    const hasta = Math.min(mostrados + PAGE_SIZE, listaActiva.length);
+    for(let i = mostrados; i < hasta; i++){
+      frag.appendChild(crearCard(listaActiva[i]));
+    }
     grid.appendChild(frag);
+    mostrados = hasta;
+    if(mostrados < listaActiva.length){
+      verMas.textContent = 'Ver más (' + (listaActiva.length - mostrados) + ')';
+      verMasWrap.classList.remove('hidden');
+    }else{
+      verMasWrap.classList.add('hidden');
+    }
+  }
+
+  function crearCard(l){
+    const card = document.createElement('article');
+    card.className = 'card';
+    const imgHtml = l.image
+      ? '<img src="'+l.image+'" alt="Portada de '+esc(l.title)+'" loading="lazy">'
+      : '<div class="no-img">'+esc(l.title.slice(0,40))+'</div>';
+    const agotado = l.available ? '' : '<span class="badge-agotado">Agotado</span>';
+    card.innerHTML =
+      '<div class="card-img">'+agotado+imgHtml+'</div>'+
+      '<div class="card-body">'+
+        '<div class="card-title">'+esc(l.title)+'</div>'+
+        (l.author ? '<div class="card-author">'+esc(l.author)+'</div>' : '')+
+        '<div class="card-price">'+money(l.price)+'</div>'+
+        '<a class="wa-btn" href="'+waLink(l)+'" target="_blank" rel="noopener">'+
+          waSvg()+' Pedir por WhatsApp'+
+        '</a>'+
+      '</div>';
+    return card;
   }
 
   function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -541,10 +591,22 @@
   });
   q.addEventListener('keydown', e=>{ if(e.key==='Enter'){clearTimeout(debounce); buscar(q.value);} });
   clearBtn.addEventListener('click', ()=>{
-    q.value=''; clearBtn.classList.remove('show'); q.focus(); mostrar($inicial);
+    q.value=''; clearBtn.classList.remove('show'); mostrarBrowse(); q.focus();
   });
-  // precarga el catálogo al primer foco para que la búsqueda sea instantánea
-  q.addEventListener('focus', ()=>{ cargarCatalogo().catch(()=>{}); }, {once:true});
+
+  // Botón "Ver más"
+  verMas.addEventListener('click', renderMas);
+
+  // Scroll infinito: carga otra tanda cuando el botón se acerca a la vista
+  if('IntersectionObserver' in window){
+    const io = new IntersectionObserver(entries=>{
+      if(entries[0].isIntersecting && mostrados < listaActiva.length) renderMas();
+    }, {rootMargin:'400px'});
+    io.observe(verMasWrap);
+  }
+
+  // Al abrir, muestra el catálogo completo
+  mostrarBrowse();
 
   // ── Datos demo (solo se ven en la vista previa, no en tu dominio real) ──
   const DEMO = [
