@@ -29,7 +29,15 @@
     WHATSAPP_NUMBER: "573114332607",
 
     // Máximo de páginas a cargar (250 libros por página).
-    MAX_PAGES: 20
+    MAX_PAGES: 20,
+
+    // Carruseles del home. "handle" = el de la URL de la colección en Shopify
+    // (tudominio/collections/EL-HANDLE). Ajústalos si no coinciden.
+    CARRUSELES: [
+      { handle: "novedades-bukz",                 eyebrow: "Novedades",            titulo: "Recién salidos del horno" },
+      { handle: "libros-de-liderazgo-y-negocios", eyebrow: "Liderazgo & Negocios", titulo: "Para los que mueven fichas" },
+      { handle: "libros-de-bienestar",            eyebrow: "Bienestar",            titulo: "Respira. Lee. Repite." }
+    ]
   };
 </script>
 
@@ -244,6 +252,51 @@
   .ver-mas:hover{transform:translate(-3px,-3px);box-shadow:var(--sombra-hover)}
   .ver-mas:active{transform:translate(2px,2px);box-shadow:3px 3px 0 var(--negro)}
 
+  /* ─── Carruseles ─── */
+  #carruseles.hidden{display:none}
+  .carrusel-seccion{margin-top:2.8rem}
+  .carrusel-seccion:first-child{margin-top:.8rem}
+  .carrusel-head{margin-bottom:1rem}
+  .carrusel-eyebrow{
+    display:inline-block;background:var(--negro);color:var(--amarillo);
+    font-weight:800;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;
+    padding:.28rem .6rem;
+  }
+  .carrusel-titulo{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:clamp(2.1rem,6vw,3.6rem);line-height:.9;letter-spacing:.02em;
+    margin-top:.5rem;
+  }
+  .carrusel-wrap{position:relative}
+  .carrusel{
+    display:flex;gap:1.2rem;overflow-x:auto;
+    padding:.3rem .2rem 1rem;
+    scroll-snap-type:x proximity;scroll-behavior:smooth;
+    -webkit-overflow-scrolling:touch;
+  }
+  .carrusel::-webkit-scrollbar{height:9px}
+  .carrusel::-webkit-scrollbar-track{background:transparent}
+  .carrusel::-webkit-scrollbar-thumb{background:var(--negro);border:2px solid var(--papel)}
+  .carrusel .card{flex:0 0 auto;width:190px;scroll-snap-align:start}
+  .carrusel .card:hover{transform:translate(-3px,-3px)}
+  .flecha{
+    position:absolute;top:34%;transform:translateY(-50%);
+    width:46px;height:46px;
+    background:var(--amarillo);color:var(--negro);
+    border:3px solid var(--negro);box-shadow:3px 3px 0 var(--negro);
+    font-family:'Bebas Neue',sans-serif;font-size:2rem;line-height:1;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:6;
+  }
+  .flecha:hover{background:#fff}
+  .flecha:active{transform:translateY(-50%) translate(2px,2px);box-shadow:1px 1px 0 var(--negro)}
+  .flecha.izq{left:-6px}
+  .flecha.der{right:-6px}
+  .carrusel-nota{
+    background:#fff;border:2px dashed var(--negro);
+    padding:.7rem .9rem;font-weight:700;font-size:.85rem;
+  }
+  @media (max-width:680px){ .flecha{display:none} .carrusel .card{width:150px} }
+
   footer{
     background:var(--negro);color:var(--papel);
     text-align:center;padding:1.6rem 1rem;
@@ -276,23 +329,16 @@
     <input id="q" type="search" autocomplete="off" placeholder="Busca por título o autor…" aria-label="Buscar libros">
     <button class="clear-btn" id="clear" aria-label="Borrar búsqueda">Limpiar</button>
   </div>
-  <div class="meta-line hidden" id="meta">
-    <span id="metaText"></span>
-    <span class="count" id="count"></span>
-  </div>
 </div>
 
 <main>
-  <!-- Estado inicial -->
-  <div class="estado" id="estadoInicial">
-    <h2>¿Qué vas a leer?</h2>
-    <p>Escribe arriba el título o el autor. Buscamos en todo el catálogo de Bukz y lo pides directo por WhatsApp.</p>
-  </div>
+  <!-- Carruseles curados (solo en el home) -->
+  <section id="carruseles"></section>
 
   <!-- Cargando -->
   <div class="estado hidden" id="estadoCargando">
     <div class="spinner"></div>
-    <h2>Buscando…</h2>
+    <h2>Cargando…</h2>
   </div>
 
   <!-- Sin resultados -->
@@ -311,6 +357,10 @@
     <p id="errorMsg">No pudimos conectar con el catálogo.</p>
   </div>
 
+  <div class="meta-line hidden" id="meta">
+    <span id="metaText"></span>
+    <span class="count" id="count"></span>
+  </div>
   <div class="grid" id="grid"></div>
   <div class="ver-mas-wrap hidden" id="verMasWrap">
     <button class="ver-mas" id="verMas">Ver más</button>
@@ -329,7 +379,7 @@
   const meta = document.getElementById('meta');
   const metaText = document.getElementById('metaText');
   const count = document.getElementById('count');
-  const $inicial = document.getElementById('estadoInicial');
+  const $carruseles = document.getElementById('carruseles');
   const $cargando = document.getElementById('estadoCargando');
   const $vacio = document.getElementById('estadoVacio');
   const $error = document.getElementById('estadoError');
@@ -373,7 +423,7 @@
 
   // ── Estados de UI ──
   function mostrar(estado){
-    [$inicial,$cargando,$vacio,$error].forEach(e=>e.classList.add('hidden'));
+    [$cargando,$vacio,$error].forEach(e=>e.classList.add('hidden'));
     grid.innerHTML='';
     meta.classList.add('hidden');
     verMasWrap.classList.add('hidden');
@@ -498,6 +548,7 @@
   async function buscar(termino){
     const t = norm(termino.trim());
     if(!t){ mostrarBrowse(); return; }
+    verCarruseles(false);
 
     if(!cargado){
       mostrar($cargando);
@@ -529,6 +580,7 @@
       mostrar($cargando);
       await cargarCatalogo();
     }
+    verCarruseles(true);
     listaActiva = catalogo;
     renderReset('Todo el catálogo');
   }
@@ -580,6 +632,94 @@
     return card;
   }
 
+  // ── Carruseles por colección ──
+  function verCarruseles(v){ $carruseles.classList.toggle('hidden', !v); }
+  function rotar(arr, n){ if(!arr.length) return arr; n = n % arr.length; return arr.slice(n).concat(arr.slice(0, n)); }
+
+  async function cargarColeccion(handle){
+    const endpoint = 'https://' + CONFIG.SHOPIFY_DOMAIN.replace(/\/$/,'') +
+                     '/api/' + CONFIG.API_VERSION + '/graphql.json';
+    const query = `query($handle:String!){
+      collection(handle:$handle){
+        products(first:10){ edges{ node{
+          title vendor handle productType tags availableForSale
+          featuredImage{ url }
+          priceRange{ minVariantPrice{ amount } }
+        }}}
+      }
+    }`;
+    try{
+      const res = await fetch(endpoint,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Shopify-Storefront-Access-Token':CONFIG.STOREFRONT_TOKEN},
+        body: JSON.stringify({ query, variables:{ handle } })
+      });
+      if(!res.ok) return [];
+      const data = await res.json();
+      const col = data && data.data && data.data.collection;
+      if(!col) return [];
+      return col.products.edges.map(e=>{
+        const n = e.node;
+        return normalizar({
+          title:n.title, vendor:n.vendor, handle:n.handle, product_type:n.productType,
+          tags:(n.tags||[]).join(' '), price:n.priceRange && n.priceRange.minVariantPrice && n.priceRange.minVariantPrice.amount,
+          available:n.availableForSale, image:(n.featuredImage && n.featuredImage.url) || ''
+        });
+      });
+    }catch(e){ return []; }
+  }
+
+  async function renderCarruseles(){
+    $carruseles.innerHTML = '';
+    for(let i = 0; i < CONFIG.CARRUSELES.length; i++){
+      const c = CONFIG.CARRUSELES[i];
+      let libros = [], nota = '';
+      if(enModoDemo){
+        libros = rotar(DEMO.map(p => normalizar(p)), i * 3);   // preview con ejemplos
+      }else{
+        libros = await cargarColeccion(c.handle);
+        if(!libros.length) nota = 'No encontramos la colección "' + c.handle + '". Revisa el handle en la configuración.';
+      }
+      $carruseles.appendChild(crearCarrusel(c, libros, nota));
+    }
+  }
+
+  function crearCarrusel(c, libros, nota){
+    const sec = document.createElement('section');
+    sec.className = 'carrusel-seccion';
+    sec.innerHTML =
+      '<div class="carrusel-head">'+
+        '<span class="carrusel-eyebrow">'+esc(c.eyebrow)+'</span>'+
+        '<h2 class="carrusel-titulo">'+esc(c.titulo)+'</h2>'+
+      '</div>';
+    if(nota){
+      const p = document.createElement('p');
+      p.className = 'carrusel-nota';
+      p.textContent = nota;
+      sec.appendChild(p);
+      return sec;
+    }
+    const wrap = document.createElement('div');
+    wrap.className = 'carrusel-wrap';
+    const row = document.createElement('div');
+    row.className = 'carrusel';
+    libros.forEach(l => row.appendChild(crearCard(l)));
+    const izq = flecha('‹','izq'), der = flecha('›','der');
+    izq.addEventListener('click', ()=>row.scrollBy({left:-row.clientWidth*0.8, behavior:'smooth'}));
+    der.addEventListener('click', ()=>row.scrollBy({left: row.clientWidth*0.8, behavior:'smooth'}));
+    wrap.appendChild(izq); wrap.appendChild(row); wrap.appendChild(der);
+    sec.appendChild(wrap);
+    return sec;
+  }
+
+  function flecha(txt, cls){
+    const b = document.createElement('button');
+    b.className = 'flecha ' + cls;
+    b.textContent = txt;
+    b.setAttribute('aria-label', cls === 'izq' ? 'Anterior' : 'Siguiente');
+    return b;
+  }
+
   function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function waSvg(){return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.8 14.09c-.24.68-1.42 1.31-1.96 1.35-.5.05-.97.24-3.27-.68-2.76-1.09-4.5-3.9-4.64-4.08-.13-.18-1.11-1.48-1.11-2.82s.7-2 .96-2.28c.24-.26.53-.32.71-.32.18 0 .35 0 .5.01.16.01.38-.06.59.45.24.56.79 1.94.86 2.08.07.14.11.3.02.48-.09.18-.14.3-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.11.55.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.11.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.23.61-.14.25.09 1.6.76 1.87.89.27.14.45.2.52.32.07.11.07.66-.17 1.34z"/></svg>';}
 
@@ -605,8 +745,16 @@
     io.observe(verMasWrap);
   }
 
-  // Al abrir, muestra el catálogo completo
-  mostrarBrowse();
+  // Al abrir: carga catálogo, arma carruseles y muestra el home
+  async function iniciar(){
+    mostrar($cargando);
+    await cargarCatalogo();
+    await renderCarruseles();
+    verCarruseles(true);
+    listaActiva = catalogo;
+    renderReset('Todo el catálogo');
+  }
+  iniciar();
 
   // ── Datos demo (solo se ven en la vista previa, no en tu dominio real) ──
   const DEMO = [
@@ -615,7 +763,11 @@
     {title:'El viaje', vendor:'Álvaro González-Alorda', handle:'el-viaje', variants:[{price:'68000',available:true}], images:[{src:'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=400'}]},
     {title:'Rayuela', vendor:'Julio Cortázar', handle:'rayuela', variants:[{price:'82000',available:false}], images:[{src:'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400'}]},
     {title:'La vorágine', vendor:'José Eustasio Rivera', handle:'la-voragine', variants:[{price:'49900',available:true}], images:[]},
-    {title:'Delirio', vendor:'Laura Restrepo', handle:'delirio', variants:[{price:'56000',available:true}], images:[{src:'https://images.unsplash.com/photo-1519682337058-a94d519337bc?w=400'}]}
+    {title:'Delirio', vendor:'Laura Restrepo', handle:'delirio', variants:[{price:'56000',available:true}], images:[{src:'https://images.unsplash.com/photo-1519682337058-a94d519337bc?w=400'}]},
+    {title:'El poder del ahora', vendor:'Eckhart Tolle', handle:'poder-del-ahora', variants:[{price:'64000',available:true}], images:[{src:'https://images.unsplash.com/photo-1589998059171-988d887df646?w=400'}]},
+    {title:'Hábitos atómicos', vendor:'James Clear', handle:'habitos-atomicos', variants:[{price:'72000',available:true}], images:[{src:'https://images.unsplash.com/photo-1592496431122-2349e0fbc666?w=400'}]},
+    {title:'Padre rico, padre pobre', vendor:'Robert Kiyosaki', handle:'padre-rico', variants:[{price:'58000',available:true}], images:[{src:'https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=400'}]},
+    {title:'Los cuatro acuerdos', vendor:'Miguel Ruiz', handle:'cuatro-acuerdos', variants:[{price:'45000',available:true}], images:[{src:'https://images.unsplash.com/photo-1621351183012-e2f9972dd9bf?w=400'}]}
   ];
 
 })();
