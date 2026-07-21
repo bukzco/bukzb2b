@@ -6,17 +6,29 @@
 <title>Bukz · Buscador</title>
 
 <!-- ══════════════════════════════════════════════════════════════
-     CONFIGURACIÓN — cambia estas dos líneas y listo
+     CONFIGURACIÓN
      ══════════════════════════════════════════════════════════════ -->
 <script>
   const CONFIG = {
-    // Dominio de tu tienda Shopify (sin https://). Ej: "bukz.store" o "tu-tienda.myshopify.com"
-    SHOPIFY_DOMAIN: "bukz.store",
+    // Dominio .myshopify.com de tu tienda (para la API). NO el dominio bonito.
+    SHOPIFY_DOMAIN: "bukz-co.myshopify.com",
 
-    // Tu WhatsApp con indicativo de país, solo números. Colombia = 57.
+    // Dominio bonito, solo para armar los links de cada libro.
+    STORE_URL: "bukz.store",
+
+    // Token de la Storefront API (solo lectura, seguro exponerlo).
+    // Cómo sacarlo: Shopify admin → Configuración → Apps y canales de venta →
+    // Desarrollar apps → Crear app → API de Storefront → activar
+    // "unauthenticated_read_product_listings" → Instalar → copiar el token.
+    STOREFRONT_TOKEN: "34d051c5e2e50033caa732db5b18d21b",
+
+    // Versión de la API de Shopify (puedes subirla si sale deprecada).
+    API_VERSION: "2026-04",
+
+    // Tu WhatsApp con indicativo, solo números. Colombia = 57.
     WHATSAPP_NUMBER: "573114332607",
 
-    // Cuántas páginas del catálogo cargar como máximo (250 libros por página)
+    // Máximo de páginas a cargar (250 libros por página).
     MAX_PAGES: 20
   };
 </script>
@@ -338,58 +350,117 @@
     if(estado) estado.classList.remove('hidden');
   }
 
-  // ── Cargar catálogo de Shopify (products.json paginado) ──
+  // ── Cargar catálogo ──
+  // Usa la Storefront API si hay token (sin CORS, recomendado).
+  // Si no, intenta products.json. Si nada conecta, muestra ejemplos.
   async function cargarCatalogo(){
     if(cargado || cargando) return;
     cargando = true;
+    const hayToken = CONFIG.STOREFRONT_TOKEN &&
+                     CONFIG.STOREFRONT_TOKEN !== 'PON_TU_TOKEN_AQUI';
     try{
-      const base = 'https://' + CONFIG.SHOPIFY_DOMAIN.replace(/\/$/,'');
-      let page = 1, acumulado = [];
-      while(page <= CONFIG.MAX_PAGES){
-        const res = await fetch(base + '/products.json?limit=250&page=' + page);
-        if(!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        const items = data.products || [];
-        acumulado = acumulado.concat(items);
-        if(items.length < 250) break;
-        page++;
-      }
-      catalogo = acumulado.map(p => normalizar(p, base));
+      catalogo = hayToken ? await cargarViaStorefront() : await cargarViaProductsJson();
+      if(!catalogo.length) throw new Error('El catálogo llegó vacío');
       cargado = true;
     }catch(err){
-      // No conectó (típico en la vista previa): usamos ejemplos y avisamos.
       catalogo = DEMO.map(p => normalizar(p));
       enModoDemo = true;
       cargado = true;
-      mostrarAvisoDemo();
+      mostrarAvisoDemo(hayToken, err && err.message);
     }
     cargando = false;
   }
 
-  function mostrarAvisoDemo(){
+  // Storefront API (GraphQL) — recomendado, sin problemas de CORS
+  async function cargarViaStorefront(){
+    const endpoint = 'https://' + CONFIG.SHOPIFY_DOMAIN.replace(/\/$/,'') +
+                     '/api/' + CONFIG.API_VERSION + '/graphql.json';
+    const query = `query($cursor:String){
+      products(first:250, after:$cursor){
+        pageInfo{ hasNextPage endCursor }
+        edges{ node{
+          title vendor handle productType tags availableForSale
+          featuredImage{ url }
+          priceRange{ minVariantPrice{ amount } }
+        }}
+      }
+    }`;
+    let cursor = null, all = [], pages = 0;
+    do{
+      const res = await fetch(endpoint,{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'X-Shopify-Storefront-Access-Token': CONFIG.STOREFRONT_TOKEN
+        },
+        body: JSON.stringify({ query, variables:{ cursor } })
+      });
+      if(!res.ok) throw new Error('HTTP ' + res.status + ' (revisa dominio, versión y token)');
+      const data = await res.json();
+      if(data.errors) throw new Error(data.errors[0].message);
+      const conn = data.data.products;
+      conn.edges.forEach(e=>{
+        const n = e.node;
+        all.push(normalizar({
+          title: n.title,
+          vendor: n.vendor,
+          handle: n.handle,
+          product_type: n.productType,
+          tags: (n.tags||[]).join(' '),
+          price: n.priceRange?.minVariantPrice?.amount,
+          available: n.availableForSale,
+          image: n.featuredImage?.url || ''
+        }));
+      });
+      cursor = conn.pageInfo.hasNextPage ? conn.pageInfo.endCursor : null;
+      pages++;
+    } while(cursor && pages < CONFIG.MAX_PAGES);
+    return all;
+  }
+
+  // products.json (sin token) — puede fallar por CORS en dominios externos
+  async function cargarViaProductsJson(){
+    const base = 'https://' + CONFIG.SHOPIFY_DOMAIN.replace(/\/$/,'');
+    let page = 1, all = [];
+    while(page <= CONFIG.MAX_PAGES){
+      const res = await fetch(base + '/products.json?limit=250&page=' + page);
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const items = data.products || [];
+      all = all.concat(items.map(p => normalizar(p)));
+      if(items.length < 250) break;
+      page++;
+    }
+    return all;
+  }
+
+  function mostrarAvisoDemo(hayToken, detalle){
     if(document.getElementById('avisoDemo')) return;
     const av = document.createElement('div');
     av.id = 'avisoDemo';
     av.className = 'aviso';
-    av.innerHTML = '👀 No conectamos con <b>' + CONFIG.SHOPIFY_DOMAIN +
-      '</b>, así que ves <b>datos de ejemplo</b>. En esta vista previa es normal; ' +
-      'cuando publiques el archivo en tu sitio, jala tu catálogo real de Shopify.';
+    const causa = hayToken
+      ? 'No conectamos con la Storefront API. Revisa el dominio .myshopify.com, el token y la versión de la API.'
+      : 'Falta el token de la Storefront API (o el products.json está bloqueado por CORS). Pon tu STOREFRONT_TOKEN en la configuración.';
+    av.innerHTML = '👀 <b>Datos de ejemplo.</b> ' + causa +
+      (detalle ? '<br><small style="opacity:.7">Detalle: ' + esc(detalle) + '</small>' : '');
     document.querySelector('.buscador-wrap').appendChild(av);
   }
 
-  // Normaliza un producto de Shopify (o del demo) a la forma que usamos
-  function normalizar(p, base){
+  // Normaliza un producto (products.json, Storefront ya mapeado, o demo)
+  function normalizar(p){
     const variante = (p.variants && p.variants[0]) || {};
-    const imagen = p.image?.src || p.images?.[0]?.src || p.featured_image || '';
+    const imagen = p.image?.src || p.images?.[0]?.src || p.image || p.featured_image || '';
+    const author = p.vendor && p.vendor.toLowerCase() !== 'bukz' ? p.vendor : (p.author || '');
     return {
       title: p.title || '',
-      author: p.vendor && p.vendor.toLowerCase() !== 'bukz' ? p.vendor : (p.author || ''),
+      author: author,
       price: variante.price ?? p.price ?? 0,
-      available: variante.available !== false,
+      available: p.available ?? (variante.available !== false),
       image: imagen,
       handle: p.handle || '',
-      url: p.url || (base ? base + '/products/' + p.handle : ''),
-      buscable: norm([p.title, p.vendor, p.author, (p.tags||''), p.product_type].join(' '))
+      url: p.handle ? 'https://' + CONFIG.STORE_URL.replace(/\/$/,'') + '/products/' + p.handle : '',
+      buscable: norm([p.title, p.vendor, author, (p.tags||''), p.product_type].join(' '))
     };
   }
 
