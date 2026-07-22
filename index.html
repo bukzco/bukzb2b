@@ -496,10 +496,11 @@
                      CONFIG.STOREFRONT_TOKEN !== 'PON_TU_TOKEN_AQUI';
     try{
       catalogo = hayToken ? await cargarViaStorefront() : await cargarViaProductsJson();
+      catalogo = catalogo.filter(l => l.available);   // oculta agotados
       if(!catalogo.length) throw new Error('El catálogo llegó vacío');
       cargado = true;
     }catch(err){
-      catalogo = DEMO.map(p => normalizar(p));
+      catalogo = DEMO.map(p => normalizar(p)).filter(l => l.available);
       enModoDemo = true;
       cargado = true;
       mostrarAvisoDemo(hayToken, err && err.message);
@@ -721,7 +722,7 @@
           tags:(n.tags||[]).join(' '), price:n.priceRange && n.priceRange.minVariantPrice && n.priceRange.minVariantPrice.amount,
           available:n.availableForSale, image:(n.featuredImage && n.featuredImage.url) || ''
         });
-      });
+      }).filter(l => l.available);
     }catch(e){ return []; }
   }
 
@@ -731,7 +732,7 @@
       const c = CONFIG.CARRUSELES[i];
       let libros = [], nota = '';
       if(enModoDemo){
-        libros = rotar(DEMO.map(p => normalizar(p)), i * 3);   // preview con ejemplos
+        libros = rotar(DEMO.map(p => normalizar(p)).filter(l => l.available), i * 3);   // preview con ejemplos
       }else{
         libros = await cargarColeccion(c.handle);
         if(!libros.length) nota = 'No encontramos la colección "' + c.handle + '". Revisa el handle en la configuración.';
