@@ -321,6 +321,25 @@
   }
   .aliado-chip img{ height:clamp(30px,4.5vw,44px);width:auto;object-fit:contain;display:block }
 
+  .fab-wa{
+    position:fixed;bottom:1.3rem;right:1.3rem;z-index:50;
+    display:inline-flex;align-items:center;gap:.65rem;
+    background:var(--wa);color:#fff;text-decoration:none;
+    border:4px solid var(--negro);box-shadow:5px 5px 0 var(--negro);
+    padding:.8rem 1.1rem;
+    transition:transform .12s ease,box-shadow .12s ease;
+  }
+  .fab-wa:hover{transform:translate(-2px,-2px);box-shadow:7px 7px 0 var(--negro);background:#2bdf70}
+  .fab-wa:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--negro)}
+  .fab-wa svg{flex:none}
+  .fab-wa-txt{display:flex;flex-direction:column;text-align:left;line-height:1.15}
+  .fab-wa-txt b{font-size:.95rem;font-weight:800}
+  .fab-wa-txt small{font-weight:600;font-size:.72rem}
+  @media (max-width:680px){
+    .fab-wa{padding:.85rem;bottom:1rem;right:1rem}
+    .fab-wa-txt{display:none}
+  }
+
   footer{
     background:var(--negro);color:var(--papel);
     text-align:center;padding:1.6rem 1rem;
@@ -398,6 +417,11 @@
     <button class="ver-mas" id="verMas">Ver más</button>
   </div>
 </main>
+
+<a class="fab-wa" href="https://wa.me/573114332607" target="_blank" rel="noopener" aria-label="Para pago inmediato escríbenos por WhatsApp">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.8 14.09c-.24.68-1.42 1.31-1.96 1.35-.5.05-.97.24-3.27-.68-2.76-1.09-4.5-3.9-4.64-4.08-.13-.18-1.11-1.48-1.11-2.82s.7-2 .96-2.28c.24-.26.53-.32.71-.32.18 0 .35 0 .5.01.16.01.38-.06.59.45.24.56.79 1.94.86 2.08.07.14.11.3.02.48-.09.18-.14.3-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.11.55.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.11.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.23.61-.14.25.09 1.6.76 1.87.89.27.14.45.2.52.32.07.11.07.66-.17 1.34z"/></svg>
+  <span class="fab-wa-txt"><b>Pago inmediato</b><small>Escríbenos por WhatsApp</small></span>
+</a>
 
 <footer>
   Hecho con amor por <b>Bukz</b> · Librería independiente · Medellín & Bogotá
