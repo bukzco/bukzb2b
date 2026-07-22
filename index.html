@@ -306,20 +306,18 @@
   }
   @media (max-width:680px){ .flecha{display:none} .carrusel .card{width:150px} }
 
-  .aliados{
-    border-top:5px solid var(--negro);
-    background:#fff;
-    padding:1.8rem clamp(1rem,5vw,3rem);
-    display:flex;flex-direction:column;align-items:center;gap:1.1rem;
+  .header-top{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    gap:1.2rem;flex-wrap:wrap;
+    position:relative;z-index:1;
   }
-  .aliados-titulo{
-    font-weight:800;text-transform:uppercase;letter-spacing:.14em;font-size:.78rem;
-    background:var(--amarillo);border:2px solid var(--negro);padding:.28rem .7rem;
+  .logo-zona{min-width:0}
+  .aliados-header{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
+  .aliado-chip{
+    background:#fff;border:3px solid var(--negro);box-shadow:3px 3px 0 var(--negro);
+    padding:.35rem .55rem;display:inline-flex;align-items:center;
   }
-  .aliados-logos{
-    display:flex;align-items:center;justify-content:center;gap:2.6rem;flex-wrap:wrap;
-  }
-  .aliados-logos img{ height:clamp(42px,7vw,64px);width:auto;object-fit:contain }
+  .aliado-chip img{ height:clamp(30px,4.5vw,44px);width:auto;object-fit:contain;display:block }
 
   footer{
     background:var(--negro);color:var(--papel);
@@ -339,9 +337,17 @@
 <body>
 
 <header>
-  <img class="logo-img" src="https://cdn.shopify.com/s/files/1/0043/3016/0163/files/logo-bukz-amarillo.png?v=1763760502" alt="Bukz"
-       onerror="this.style.display='none';document.getElementById('logoText').style.display='block'">
-  <div class="logo" id="logoText" style="display:none">BU<b>K</b>Z</div>
+  <div class="header-top">
+    <div class="logo-zona">
+      <img class="logo-img" src="https://cdn.shopify.com/s/files/1/0043/3016/0163/files/logo-bukz-amarillo.png?v=1763760502" alt="Bukz"
+           onerror="this.style.display='none';document.getElementById('logoText').style.display='block'">
+      <div class="logo" id="logoText" style="display:none">BU<b>K</b>Z</div>
+    </div>
+    <div class="aliados-header">
+      <span class="aliado-chip"><img src="https://cdn.shopify.com/s/files/1/0043/3016/0163/files/images_1_00b27dff-7ea6-4b33-a8c8-1971ade61042.png?v=1784749672" alt="Aliado" loading="lazy" onerror="this.parentNode.style.display='none'"></span>
+      <span class="aliado-chip"><img src="https://cdn.shopify.com/s/files/1/0043/3016/0163/files/industrias-aliadas.png?v=1784749672" alt="Industrias aliadas" loading="lazy" onerror="this.parentNode.style.display='none'"></span>
+    </div>
+  </div>
   <p class="tagline">Escribe el nombre del libro. Nosotros lo tenemos.<span class="punto"> Punto.</span></p>
 </header>
 
@@ -390,14 +396,6 @@
     <button class="ver-mas" id="verMas">Ver más</button>
   </div>
 </main>
-
-<section class="aliados">
-  <span class="aliados-titulo">Aliados</span>
-  <div class="aliados-logos">
-    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR6OT8T2HkKQ5TITjr0snuT5q5FTZw0eH0wWg&s" alt="Aliado" loading="lazy" onerror="this.style.display='none'">
-    <img src="https://industriacolombianadecafe.com/wp-content/uploads/2023/08/industrias-aliadas.png" alt="Industrias aliadas" loading="lazy" onerror="this.style.display='none'">
-  </div>
-</section>
 
 <footer>
   Hecho con amor por <b>Bukz</b> · Librería independiente · Medellín & Bogotá
